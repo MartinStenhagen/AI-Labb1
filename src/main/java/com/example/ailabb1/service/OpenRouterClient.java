@@ -1,5 +1,6 @@
 package com.example.ailabb1.service;
 
+import com.example.ailabb1.exception.AiServiceException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -45,18 +46,25 @@ public class OpenRouterClient {
                 messages
         );
 
-        OpenRouterResponse response = webClient.post()
-                .uri("/chat/completions")
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(OpenRouterResponse.class)
-                .block();
+        try {
+            OpenRouterResponse response = webClient.post()
+                    .uri("/chat/completions")
+                    .bodyValue(request)
+                    .retrieve()
+                    .bodyToMono(OpenRouterResponse.class)
+                    .block();
 
-        if (response == null || response.choices() == null || response.choices().isEmpty()) {
-            throw new IllegalStateException("Tomt svar från OpenRouter");
+            if (response == null || response.choices() == null || response.choices().isEmpty()) {
+                throw new AiServiceException("Tomt svar från AI-tjänsten.");
+            }
+
+            return response.choices().getFirst().message().content();
+
+        } catch (WebClientResponseException exception) {
+            throw new AiServiceException("AI-tjänsten svarade med felstatus: " + exception.getStatusCode(), exception);
+        } catch (Exception exception) {
+            throw new AiServiceException("Kunde inte kontakta AI-tjänsten.", exception);
         }
-
-        return response.choices().getFirst().message().content();
     }
 
     public record OpenRouterRequest(
