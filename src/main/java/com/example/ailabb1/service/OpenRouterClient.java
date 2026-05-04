@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -52,7 +53,7 @@ public class OpenRouterClient {
                     .bodyValue(request)
                     .retrieve()
                     .bodyToMono(OpenRouterResponse.class)
-                    .block();
+                    .block(Duration.ofSeconds(25));
 
             if (response == null || response.choices() == null || response.choices().isEmpty()) {
                 throw new AiServiceException("Tomt svar från AI-tjänsten.");
@@ -60,10 +61,20 @@ public class OpenRouterClient {
 
             return response.choices().getFirst().message().content();
 
+        } catch (WebClientResponseException.TooManyRequests exception) {
+            throw new AiServiceException("För många anrop till AI-tjänsten. Vänta en stund och försök igen.", exception);
+
+        } catch (WebClientResponseException.ServiceUnavailable exception) {
+            throw new AiServiceException("AI-tjänsten är tillfälligt otillgänglig. Försök igen strax.", exception);
+
+        } catch (WebClientResponseException.BadRequest exception) {
+            throw new AiServiceException("AI-tjänsten nekade begäran. Kontrollera vald modell och request-format.", exception);
+
         } catch (WebClientResponseException exception) {
             throw new AiServiceException("AI-tjänsten svarade med felstatus: " + exception.getStatusCode(), exception);
+
         } catch (Exception exception) {
-            throw new AiServiceException("Kunde inte kontakta AI-tjänsten.", exception);
+            throw new AiServiceException("Kunde inte kontakta AI-tjänsten eller så tog anropet för lång tid.", exception);
         }
     }
 
