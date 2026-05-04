@@ -1,6 +1,7 @@
 package com.example.ailabb1.service;
 
 import com.example.ailabb1.exception.AiServiceException;
+import com.example.ailabb1.exception.AiTemporaryException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -35,7 +36,8 @@ public class OpenRouterClient {
     @Retryable(
             includes = {
                     WebClientResponseException.TooManyRequests.class,
-                    WebClientResponseException.ServiceUnavailable.class
+                    WebClientResponseException.ServiceUnavailable.class,
+                    AiTemporaryException.class
             },
             maxRetries = 2,
             delay = 1000,
@@ -62,10 +64,10 @@ public class OpenRouterClient {
             return response.choices().getFirst().message().content();
 
         } catch (WebClientResponseException.TooManyRequests exception) {
-            throw new AiServiceException("För många anrop till AI-tjänsten. Vänta en stund och försök igen.", exception);
+            throw new AiTemporaryException("För många anrop till AI-tjänsten. Vänta en stund och försök igen.", exception);
 
         } catch (WebClientResponseException.ServiceUnavailable exception) {
-            throw new AiServiceException("AI-tjänsten är tillfälligt otillgänglig. Försök igen strax.", exception);
+            throw new AiTemporaryException("AI-tjänsten är tillfälligt otillgänglig. Försök igen strax.", exception);
 
         } catch (WebClientResponseException.BadRequest exception) {
             throw new AiServiceException("AI-tjänsten nekade begäran. Kontrollera vald modell och request-format.", exception);
