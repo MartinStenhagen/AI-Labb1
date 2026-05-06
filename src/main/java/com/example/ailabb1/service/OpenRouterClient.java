@@ -4,6 +4,7 @@ import com.example.ailabb1.exception.AiServiceException;
 import com.example.ailabb1.exception.AiTemporaryException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.resilience.annotation.ConcurrencyLimit;
 import org.springframework.resilience.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -26,11 +27,14 @@ public class OpenRouterClient {
         this.restClient = restClient;
     }
 
+    @ConcurrencyLimit(5)
     @Retryable(
             includes = AiTemporaryException.class,
             maxRetries = 2,
             delay = 1000,
-            multiplier = 2
+            jitter = 500,
+            multiplier = 2,
+            maxDelay = 5000
     )
     public String chat(List<OpenRouterMessage> messages) {
         try {
@@ -52,54 +56,81 @@ public class OpenRouterClient {
             return response.choices().getFirst().message().content();
 
         } catch (RestClientResponseException exception) {
-
-            int status = exception.getStatusCode().value();
-
-            if (status == 429) {
-                throw new AiTemporaryException(
-                        "För många anrop till AI-tjänsten. Vänta en stund och försök igen.",
-                        exception
-                );
-            }
-
-            if (status == 503) {
-                throw new AiTemporaryException(
-                        "AI-tjänsten är tillfälligt otillgänglig. Försök igen strax.",
-                        exception
-                );
-            }
-
-            if (status >= 500) {
-                throw new AiTemporaryException(
-                        "AI-tjänsten svarade med ett tillfälligt serverfel.",
-                        exception
-                );
-            }
-
-            if (status == 400) {
-                throw new AiServiceException(
-                        "AI-tjänsten nekade begäran. Kontrollera modellnamn och request-format.",
-                        exception
-                );
-            }
-
-            throw new AiServiceException(
-                    "AI-tjänsten svarade med felstatus: " + exception.getStatusCode(),
-                    exception
-            );
+            throw mapOpenRouterException(exception);
 
         } catch (AiServiceException exception) {
             throw exception;
 
         } catch (Exception exception) {
-            throw new AiServiceException(
-                    "Kunde inte kontakta AI-tjänsten.",
+            throw new AiTemporaryException(
+                    "Kunde inte kontakta AI-tjänsten. Det kan bero på nätverk eller timeout.",
                     exception
             );
         }
     }
 
-    // --- DTOs (records funkar perfekt här) ---
+    private RuntimeException mapOpenRouterException(RestClientResponseException exception) {
+        int status = exception.getStatusCode().value();
+
+        if (status == 429) {
+            String retryAfter = exception.getResponseHeaders() != null
+                    ? exception.getResponseHeaders().getFirst(HttpHeaders.RETRY_AFTER)
+                    : null;
+
+            String message = retryAfter == null
+                    ? "För många anrop till AI-tjänsten. Vänta en stund och försök igen."
+                    : "För många anrop till AI-tjänsten. Försök igen efter cirka " + retryAfter + " sekunder.";
+
+            return new AiTemporaryException(message, exception);
+        }
+
+        if (status == 408 || status == 502 || status == 503 || status == 504) {
+            return new AiTemporaryException(
+                    "AI-tjänsten är tillfälligt otillgänglig eller svarade för långsamt.",
+                    exception
+            );
+        }
+
+        if (status == 500) {
+            return new AiTemporaryException(
+                    "AI-tjänsten svarade med ett tillfälligt serverfel.",
+                    exception
+            );
+        }
+
+        if (status == 400) {
+            return new AiServiceException(
+                    "AI-tjänsten nekade begäran. Kontrollera modellnamn och request-format.",
+                    exception
+            );
+        }
+
+        if (status == 401 || status == 403) {
+            return new AiServiceException(
+                    "AI-tjänsten nekade åtkomst. Kontrollera API-nyckel och behörigheter.",
+                    exception
+            );
+        }
+
+        if (status == 404) {
+            return new AiServiceException(
+                    "AI-modellen eller endpointen kunde inte hittas.",
+                    exception
+            );
+        }
+
+        if (status >= 400 && status < 500) {
+            return new AiServiceException(
+                    "AI-tjänsten nekade begäran med status: " + exception.getStatusCode(),
+                    exception
+            );
+        }
+
+        return new AiServiceException(
+                "AI-tjänsten svarade med oväntad status: " + exception.getStatusCode(),
+                exception
+        );
+    }
 
     public record OpenRouterRequest(
             String model,
