@@ -51,50 +51,50 @@ public class OpenRouterClient {
 
             return response.choices().getFirst().message().content();
 
-        } catch (RestClientResponseException e) {
+        } catch (RestClientResponseException exception) {
 
-            int status = e.getStatusCode().value();
+            int status = exception.getStatusCode().value();
 
             if (status == 429) {
                 throw new AiTemporaryException(
                         "För många anrop till AI-tjänsten. Vänta en stund och försök igen.",
-                        e
+                        exception
                 );
             }
 
             if (status == 503) {
                 throw new AiTemporaryException(
                         "AI-tjänsten är tillfälligt otillgänglig. Försök igen strax.",
-                        e
+                        exception
                 );
             }
 
             if (status >= 500) {
                 throw new AiTemporaryException(
                         "AI-tjänsten svarade med ett tillfälligt serverfel.",
-                        e
+                        exception
                 );
             }
 
             if (status == 400) {
                 throw new AiServiceException(
                         "AI-tjänsten nekade begäran. Kontrollera modellnamn och request-format.",
-                        e
+                        exception
                 );
             }
 
             throw new AiServiceException(
-                    "AI-tjänsten svarade med felstatus: " + e.getStatusCode(),
-                    e
+                    "AI-tjänsten svarade med felstatus: " + exception.getStatusCode(),
+                    exception
             );
 
-        } catch (AiServiceException e) {
-            throw e;
+        } catch (AiServiceException exception) {
+            throw exception;
 
-        } catch (Exception e) {
+        } catch (Exception exception) {
             throw new AiServiceException(
                     "Kunde inte kontakta AI-tjänsten.",
-                    e
+                    exception
             );
         }
     }
