@@ -1,0 +1,134 @@
+body {
+    margin: 0;
+    background: #111827;
+    color: #f9fafb;
+    font-family: Arial, sans-serif;
+}
+
+.chat-container {
+    max-width: 900px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 32px;
+    box-sizing: border-box;
+    background: #1f2937;
+}
+
+.chat-header {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 32px;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.chat-header h1 {
+    margin: 0;
+    font-size: 2.5rem;
+    line-height: 1.1;
+}
+
+.personality-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.personality-field label {
+    font-size: 0.95rem;
+    color: #cbd5e1;
+}
+
+.personality-field select {
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    border: none;
+    font-size: 1rem;
+}
+
+.chat-history {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    background: #111827;
+    border-radius: 16px;
+}
+
+.message {
+    max-width: 75%;
+    padding: 14px;
+    border-radius: 14px;
+}
+
+.message strong {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.message p {
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.user-message {
+    align-self: flex-end;
+    background: #2563eb;
+}
+
+.ai-message {
+    align-self: flex-start;
+    background: #374151;
+}
+
+.error-message {
+    align-self: center;
+    background: #991b1b;
+}
+
+.chat-input-area {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: 1fr 160px;
+    gap: 16px;
+}
+
+textarea {
+    resize: none;
+    border: none;
+    border-radius: 14px;
+    padding: 18px;
+    font-size: 1rem;
+}
+
+button {
+    border: none;
+    border-radius: 14px;
+    background: #3b82f6;
+    color: white;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
