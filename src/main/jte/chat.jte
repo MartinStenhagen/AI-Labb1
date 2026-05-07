@@ -10,7 +10,7 @@
 <main class="chat-container">
 
     <header class="chat-header">
-        <h1>AI-Labb1</h1>
+        <h1>AI-Chat</h1>
 
         <label for="personality" class="sr-only">Välj personlighet</label>
         <div class="personality-field">
@@ -71,9 +71,12 @@
         sendButton.disabled = true;
         messageInput.disabled = true;
 
-        try {
+        let loadingMessage = null;
 
+        try {
             appendMessage("Du", message, "user-message");
+
+            loadingMessage = appendLoadingMessage();
 
             messageInput.value = "";
 
@@ -91,17 +94,31 @@
 
             const data = await response.json();
 
+            removeLoadingMessage(loadingMessage);
+
+            if (!response.ok) {
+                appendMessage(
+                    "System",
+                    data.message || "Något gick fel när AI-tjänsten anropades.",
+                    "error-message"
+                );
+                return;
+            }
+
             appendMessage("AI", data.answer, "ai-message");
 
         } catch (error) {
+            removeLoadingMessage(loadingMessage);
 
-            appendMessage("System", "Kunde inte kontakta AI-tjänsten.", "error-message");
+            appendMessage(
+                "System",
+                "Kunde inte kontakta servern.",
+                "error-message"
+            );
 
         } finally {
-
             sendButton.disabled = false;
             messageInput.disabled = false;
-
             messageInput.focus();
         }
     }
@@ -123,6 +140,50 @@
 
         history.appendChild(wrapper);
         history.scrollTop = history.scrollHeight;
+    }
+
+    function appendLoadingMessage() {
+        const history = document.getElementById("chat-history");
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "message ai-message loading-message";
+
+        const senderElement = document.createElement("strong");
+        senderElement.textContent = "AI";
+
+        const textElement = document.createElement("p");
+        textElement.textContent = "AI skriver";
+
+        wrapper.appendChild(senderElement);
+        wrapper.appendChild(textElement);
+
+        history.appendChild(wrapper);
+        history.scrollTop = history.scrollHeight;
+
+        let dots = 0;
+
+        const intervalId = setInterval(function () {
+            dots = (dots + 1) % 4;
+            textElement.textContent = "AI skriver" + ".".repeat(dots);
+        }, 500);
+
+        wrapper.dataset.intervalId = intervalId.toString();
+
+        return wrapper;
+    }
+
+    function removeLoadingMessage(element) {
+        if (!element) {
+            return;
+        }
+
+        const intervalId = element.dataset.intervalId;
+
+        if (intervalId) {
+            clearInterval(Number(intervalId));
+        }
+
+        element.remove();
     }
 
 </script>
