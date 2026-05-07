@@ -1,8 +1,8 @@
 package com.example.ailabb1.service;
 
+import com.example.ailabb1.config.AiProperties;
 import com.example.ailabb1.exception.AiServiceException;
 import com.example.ailabb1.exception.AiTemporaryException;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.resilience.annotation.ConcurrencyLimit;
 import org.springframework.resilience.annotation.Retryable;
@@ -16,15 +16,11 @@ import java.util.List;
 public class OpenRouterClient {
 
     private final RestClient restClient;
+    private final AiProperties aiProperties;
 
-    @Value("${ai.api-key}")
-    private String apiKey;
-
-    @Value("${ai.model}")
-    private String model;
-
-    public OpenRouterClient(RestClient restClient) {
+    public OpenRouterClient(RestClient restClient, AiProperties aiProperties) {
         this.restClient = restClient;
+        this.aiProperties = aiProperties;
     }
 
     @ConcurrencyLimit(5)
@@ -38,11 +34,15 @@ public class OpenRouterClient {
     )
     public String chat(List<OpenRouterMessage> messages) {
         try {
-            OpenRouterRequest request = new OpenRouterRequest(model, messages);
+            OpenRouterRequest request = new OpenRouterRequest(
+                    aiProperties.model(),
+                    messages,
+                    0.3
+            );
 
             OpenRouterResponse response = restClient.post()
                     .uri("/chat/completions")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + aiProperties.apiKey())
                     .header("HTTP-Referer", "http://localhost:8080")
                     .header("X-Title", "AI-Labb1")
                     .body(request)
@@ -134,7 +134,8 @@ public class OpenRouterClient {
 
     public record OpenRouterRequest(
             String model,
-            List<OpenRouterMessage> messages
+            List<OpenRouterMessage> messages,
+            double temperature
     ) {}
 
     public record OpenRouterMessage(
