@@ -50,22 +50,34 @@ Tidigare meddelanden sparas i minnet så att modellen får kontext mellan reques
 
 # Felhantering
 
-Projektet implementerar flera resilience-mekanismer:
+Projektet använder flera resilience-mekanismer via Resilience4j för att hantera fel mot externa AI-tjänster.
+
+Implementerade mekanismer:
 
 * Retry
 * Exponential backoff
 * Jitter
+* Circuit Breaker
 * Timeout-hantering
 * Concurrency limiting
+* Fallback responses
 * Global exception handling
 
-Retry används endast för transienta fel:
+Retry används endast för transienta fel såsom:
 
 * 429 Too Many Requests
 * 502 Bad Gateway
 * 503 Service Unavailable
 * 504 Gateway Timeout
 * nätverksfel/timeouts
+
+Retry används INTE för permanenta klientfel såsom:
+
+* 400 Bad Request
+* 401 Unauthorized
+* 403 Forbidden
+
+Vid upprepade temporära fel aktiveras fallback-logik som returnerar ett kontrollerat felmeddelande istället för att krascha applikationen.
 
 Projektet tar även hänsyn till failure patterns i distribuerade system såsom:
 
@@ -79,6 +91,7 @@ Motåtgärder:
 * exponential backoff
 * jitter
 * transient error classification
+* circuit breaker
 * concurrency limiting
 
 ---
@@ -93,7 +106,7 @@ Motåtgärder:
 | `PersonalityService`     | Hanterar system prompts/personligheter |
 | `ChatMemoryService`      | Sessionshistorik                       |
 | `GlobalExceptionHandler` | API-felhantering                       |
-
+| `OpenRouterClient`       | Kommunikation med OpenRouter + resilience/fallback |
 ---
 
 # API
@@ -143,15 +156,35 @@ http://localhost:8080/chat
 
 # Konfiguration
 
-## Miljövariabler
+# Konfiguration
 
-Projektet använder miljövariabler för känslig information.
+## OpenRouter API-nyckel
 
-### Exempel
+Projektet kräver en giltig OpenRouter API-nyckel för att kunna startas och använda AI-funktionerna.
 
-```env
-OPENROUTER_API_KEY=din-api-nyckel
+Skapa en API-nyckel via:
+
+https://openrouter.ai/
+
+---
+
+## application.properties
+
+```properties
+ai.base-url=https://openrouter.ai/api/v1
+ai.api-key=${OPENROUTER_API_KEY}
+ai.model=z-ai/glm-4.5-air:free
 ```
+
+---
+
+## Viktigt
+
+Projektet läser INTE automatiskt `.env`-filer.
+
+Miljövariabeln måste därför sättas manuellt i terminalen eller i IntelliJ innan applikationen startas.
+
+Om API-nyckeln saknas kommer applikationen inte kunna anropa OpenRouter.
 
 ---
 
@@ -171,27 +204,73 @@ ai.model=z-ai/glm-4.5-air:free
 
 ```bash
 git clone <repo-url>
+cd AI-Labb1
 ```
 
 ---
 
-## 2. Sätt miljövariabel
+## 2. Ange OpenRouter API-nyckel
 
 ### Windows PowerShell
 
 ```powershell
-$env:OPENROUTER_API_KEY="din-nyckel"
+$env:OPENROUTER_API_KEY="din-api-nyckel"
+```
+
+### Windows CMD
+
+```cmd
+set OPENROUTER_API_KEY=din-api-nyckel
 ```
 
 ### Linux/macOS
 
 ```bash
-export OPENROUTER_API_KEY="din-nyckel"
+export OPENROUTER_API_KEY="din-api-nyckel"
 ```
 
 ---
 
-## 3. Starta projektet
+## 3. Verifiera miljövariabeln (valfritt)
+
+### PowerShell
+
+```powershell
+echo $env:OPENROUTER_API_KEY
+```
+
+### CMD
+
+```cmd
+echo %OPENROUTER_API_KEY%
+```
+
+### Linux/macOS
+
+```bash
+echo $OPENROUTER_API_KEY
+```
+
+
+
+# IntelliJ-konfiguration
+
+Om projektet körs via IntelliJ behöver miljövariabeln sättas i Run Configuration.
+
+## IntelliJ
+
+1. Open Run Configuration
+2. Välj applikationen
+3. Gå till "Environment Variables"
+4. Lägg till:
+
+```text
+OPENROUTER_API_KEY=din-api-nyckel
+```
+
+5. Starta applikationen
+
+## 4. Starta applikationen
 
 ```bash
 mvn spring-boot:run
@@ -199,30 +278,18 @@ mvn spring-boot:run
 
 ---
 
-# Docker
+## 5. Öppna applikationen
 
-## Build image
+### Webbgränssnitt
 
-```bash
-docker build -t ai-labb1 .
+```text
+http://localhost:8080/chat
 ```
 
-## Run container
+### Swagger/OpenAPI
 
-### Windows CMD
-
-```bash
-docker run -p 8080:8080 ^
--e OPENROUTER_API_KEY=din-nyckel ^
-ai-labb1
-```
-
-### Linux/macOS
-
-```bash
-docker run -p 8080:8080 \
--e OPENROUTER_API_KEY=din-nyckel \
-ai-labb1
+```text
+http://localhost:8080/swagger-ui.html
 ```
 
 ---
@@ -240,6 +307,9 @@ Projektet innehåller:
 Testerna verifierar bland annat:
 
 * retry-beteende
+* retry + fallback
+* circuit breaker
+* transient vs permanenta fel
 * API-fel
 * session memory
 * personality prompts
