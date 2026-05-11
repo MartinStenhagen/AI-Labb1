@@ -4,11 +4,11 @@ import com.example.ailabb1.config.AiProperties;
 import com.example.ailabb1.exception.AiServiceException;
 import com.example.ailabb1.exception.AiTemporaryException;
 import org.springframework.http.HttpHeaders;
-import org.springframework.resilience.annotation.ConcurrencyLimit;
-import org.springframework.resilience.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 
 import java.util.List;
 
@@ -23,15 +23,8 @@ public class OpenRouterClient {
         this.aiProperties = aiProperties;
     }
 
-    @ConcurrencyLimit(5)
-    @Retryable(
-            includes = AiTemporaryException.class,
-            maxRetries = 2,
-            delay = 1000,
-            jitter = 500,
-            multiplier = 2,
-            maxDelay = 5000
-    )
+    @CircuitBreaker(name = "openRouterClient", fallbackMethod = "fallback")
+    @Retry(name = "openRouterClient")
     public String chat(List<OpenRouterMessage> messages) {
         try {
             OpenRouterRequest request = new OpenRouterRequest(
@@ -67,6 +60,26 @@ public class OpenRouterClient {
                     exception
             );
         }
+    }
+
+    public String fallback(List<OpenRouterMessage> messages, Throwable throwable) {
+
+        Throwable cause = throwable.getCause();
+
+        if (throwable instanceof AiServiceException exception
+                && !(throwable instanceof AiTemporaryException)) {
+            throw exception;
+        }
+
+        if (cause instanceof AiServiceException exception
+                && !(cause instanceof AiTemporaryException)) {
+            throw exception;
+        }
+
+        throw new AiServiceException(
+                "AI-tjänsten är tillfälligt otillgänglig efter flera försök.",
+                throwable
+        );
     }
 
     private RuntimeException mapOpenRouterException(RestClientResponseException exception) {
